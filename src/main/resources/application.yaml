@@ -1,3 +1,23 @@
 spring:
   application:
     name: shmtu-server-unofficial
+  docker:
+    compose:
+      file: docker/PostgreSQL/docker-compose.yml
+  datasource:
+    url: jdbc:postgresql://localhost:5432/yd
+    username: admin
+    password: 123456
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: Asia/Shanghai
+
+server:
+  port: 8080
