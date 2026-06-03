@@ -21,3 +21,29 @@ spring:
 
 server:
   port: 8080
+
+jwt:
+  secret: "shmtu-server-unofficial-jwt-secret-key-change-in-production"
+  expiration: 86400000
+
+encryption:
+  aes:
+    key: "shmtu-aes-secret-key-change-in-production"
+
+ocr:
+  mode: http
+  tcp:
+    host: localhost
+    port: 5000
+  http:
+    base-url: http://localhost:5001
+  retry-times: 3
+
+scheduler:
+  bill-sync:
+    enabled: true
+    cron: "0 0 */2 * * *"
+  session-check:
+    enabled: true
+    cron: "0 0 * * * *"
+  session-expire-threshold: 30
