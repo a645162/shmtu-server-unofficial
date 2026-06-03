@@ -1,3 +1,6 @@
+# Vibe Coding
+.omc/
+
 HELP.md
 .gradle
 build/
@@ -38,3 +41,6 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+*.salive
+*.log
