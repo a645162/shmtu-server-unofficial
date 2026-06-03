@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "2.2.21"
     kotlin("plugin.spring") version "2.2.21"
+    kotlin("plugin.serialization") version "2.2.21" apply false
     id("org.springframework.boot") version "4.0.6"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.hibernate.orm") version "7.2.12.Final"
@@ -14,7 +15,7 @@ description = "shmtu-server-unofficial"
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(24)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -22,7 +23,14 @@ repositories {
     mavenCentral()
 }
 
+subprojects {
+    repositories {
+        mavenCentral()
+    }
+}
+
 dependencies {
+    implementation(project(":cas-lib"))
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
