@@ -72,7 +72,8 @@ class AuthService(
             wecomEnabled = user.wecomEnabled,
             dingtalkEnabled = user.dingtalkEnabled,
             emailEnabled = user.emailEnabled,
-            webhookEnabled = user.webhookEnabled
+            webhookEnabled = user.webhookEnabled,
+            messageTemplateOverride = user.messageTemplateOverride
         )
     }
 

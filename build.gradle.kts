@@ -48,6 +48,8 @@ dependencies {
     implementation("com.larksuite.oapi:oapi-sdk:2.6.1")
     implementation("commons-codec:commons-codec:1.17.1")
     implementation("org.json:json:20240303")
+    implementation("com.github.jknack:handlebars:4.4.0")
+    implementation("com.github.jknack:handlebars-jackson:4.4.0")
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     developmentOnly("org.springframework.boot:spring-boot-docker-compose")

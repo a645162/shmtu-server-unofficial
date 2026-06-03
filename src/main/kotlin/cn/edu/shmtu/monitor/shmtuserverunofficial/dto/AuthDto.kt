@@ -31,7 +31,8 @@ data class UserInfoResponse(
     val wecomEnabled: Boolean,
     val dingtalkEnabled: Boolean,
     val emailEnabled: Boolean,
-    val webhookEnabled: Boolean
+    val webhookEnabled: Boolean,
+    val messageTemplateOverride: String? = null
 )
 
 data class PasswordChangeRequest(

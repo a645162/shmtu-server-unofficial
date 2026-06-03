@@ -9,7 +9,8 @@ import org.springframework.stereotype.Service
 
 @Service
 class NotificationDispatcher(
-    private val channels: List<NotificationChannel>
+    private val channels: List<NotificationChannel>,
+    private val templateService: TemplateService
 ) {
     private val logger = LoggerFactory.getLogger(NotificationDispatcher::class.java)
     private val channelMap = channels.associateBy { it.channelId }
@@ -35,11 +36,13 @@ class NotificationDispatcher(
             ))
         }
 
+        val rendered = templateService.render(user, type, title, content)
+
         val results = enabledChannelIds.mapNotNull { channelId ->
             val channel = channelMap[channelId] ?: return@mapNotNull null
             if (!channel.isAvailable() || !channel.isConfiguredForUser(user)) return@mapNotNull null
             try {
-                channel.send(user, title, content)
+                channel.send(user, rendered.title, rendered.content)
             } catch (e: Exception) {
                 logger.error("Channel $channelId failed for user ${user.id}", e)
                 ChannelResult(success = false, channelId = channelId, error = e.message)
@@ -58,7 +61,8 @@ class NotificationDispatcher(
             ?: return ChannelResult(success = false, channelId = channelId, error = "Unknown channel: $channelId")
         if (!channel.isAvailable()) return ChannelResult(success = false, channelId = channelId, error = "Channel not available")
         if (!channel.isConfiguredForUser(user)) return ChannelResult(success = false, channelId = channelId, error = "Channel not configured for user")
-        return channel.send(user, title, content)
+        val rendered = templateService.render(user, type, title, content)
+        return channel.send(user, rendered.title, rendered.content)
     }
 
     fun getConfiguredChannelsForUser(user: User): List<ChannelInfo> {

@@ -3,6 +3,7 @@ package cn.edu.shmtu.monitor.shmtuserverunofficial.service
 import cn.edu.shmtu.monitor.shmtuserverunofficial.dto.*
 import cn.edu.shmtu.monitor.shmtuserverunofficial.entity.NotificationLog
 import cn.edu.shmtu.monitor.shmtuserverunofficial.notification.NotificationDispatcher
+import cn.edu.shmtu.monitor.shmtuserverunofficial.notification.TemplateService
 import cn.edu.shmtu.monitor.shmtuserverunofficial.repository.NotificationLogRepository
 import cn.edu.shmtu.monitor.shmtuserverunofficial.repository.UserRepository
 import org.slf4j.LoggerFactory
@@ -14,7 +15,8 @@ import java.time.LocalDateTime
 class NotificationService(
     private val notificationLogRepository: NotificationLogRepository,
     private val userRepository: UserRepository,
-    private val notificationDispatcher: NotificationDispatcher
+    private val notificationDispatcher: NotificationDispatcher,
+    private val templateService: TemplateService
 ) {
     private val logger = LoggerFactory.getLogger(NotificationService::class.java)
 
@@ -103,6 +105,7 @@ class NotificationService(
         request.notificationEmail?.let { user.notificationEmail = it }
         request.customWebhookUrl?.let { user.customWebhookUrl = it }
         request.customWebhookHeaders?.let { user.customWebhookHeaders = it }
+        request.messageTemplateOverride?.let { user.messageTemplateOverride = it }
         user.updatedAt = LocalDateTime.now()
 
         userRepository.save(user)
@@ -112,6 +115,53 @@ class NotificationService(
         val user = userRepository.findById(userId)
             .orElseThrow { IllegalArgumentException("User not found") }
         return notificationDispatcher.getConfiguredChannelsForUser(user)
+    }
+
+    // ============= 模板编辑器辅助 =============
+
+    /**
+     * 返回 type 对应的系统默认模板源码（用于 Web 端"从默认模板开始"按钮）。
+     * 永远非空：拿不到 type 模板就回退到 DEFAULT。
+     */
+    fun getDefaultTemplate(type: String): TemplateDefaultResponse {
+        val source = templateService.readDefaultSource(type) ?: ""
+        return TemplateDefaultResponse(
+            type = type,
+            source = source,
+            placeholders = templateService.supportedPlaceholders()
+        )
+    }
+
+    /**
+     * 校验用户输入的 Handlebars 源码是否合法（不写库，只渲染一次样本）。
+     */
+    fun validateTemplate(userId: Long, request: TemplateValidateRequest): TemplateValidateResponse {
+        val user = userRepository.findById(userId)
+            .orElseThrow { IllegalArgumentException("User not found") }
+        val result = templateService.validate(
+            source = request.source,
+            type = request.type,
+            title = request.sampleTitle,
+            content = request.sampleContent,
+            user = user
+        )
+        return TemplateValidateResponse(
+            valid = result.valid,
+            rendered = result.rendered,
+            error = result.error
+        )
+    }
+
+    /**
+     * 清除当前用户的模板 override，恢复使用系统默认。
+     */
+    @Transactional
+    fun clearUserTemplateOverride(userId: Long) {
+        val user = userRepository.findById(userId)
+            .orElseThrow { IllegalArgumentException("User not found") }
+        user.messageTemplateOverride = null
+        user.updatedAt = LocalDateTime.now()
+        userRepository.save(user)
     }
 
     private fun NotificationLog.toDto() = NotificationDto(

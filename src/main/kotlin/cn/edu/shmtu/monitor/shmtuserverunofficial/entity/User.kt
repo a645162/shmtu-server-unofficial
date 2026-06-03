@@ -89,6 +89,10 @@ class User(
     @Column(name = "custom_webhook_headers", columnDefinition = "TEXT")
     var customWebhookHeaders: String? = null,
 
+    // 用户级消息模板（Handlebars 源码）。为空时回退到 classpath: templates/notifications/<TYPE>.hbs。
+    @Column(name = "message_template_override", columnDefinition = "TEXT")
+    var messageTemplateOverride: String? = null,
+
     @Column(name = "created_at", updatable = false)
     var createdAt: LocalDateTime = LocalDateTime.now(),
 

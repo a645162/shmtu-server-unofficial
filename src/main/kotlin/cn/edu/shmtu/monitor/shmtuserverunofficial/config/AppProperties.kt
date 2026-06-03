@@ -19,18 +19,23 @@ class AesProperties {
 @Component
 @ConfigurationProperties(prefix = "ocr")
 class OcrProperties {
-    var mode: String = "http"
-    val tcp = TcpConfig()
-    val http = HttpConfig()
-    var retryTimes: Int = 3
+    /**
+     * 多个 OCR 服务器列表，按平均耗时升序动态排序；调用时按序尝试，单台失败立即换下一台，最多试 max-try 台。
+     * 内存滑动窗口统计每台最近 windowSize 次的耗时 / 成功率，用于排序；启动时各台排序权重 = initialWeight。
+     */
+    var servers: List<OcrServerConfig> = emptyList()
+    var maxTry: Int = 3
+    var perServerTimeoutMs: Long = 3000
+    var windowSize: Int = 20
+    var initialWeight: Int = 1000  // 未采样时的初始权重（ms），越大排序越靠后
 
-    class TcpConfig {
-        var host: String = "localhost"
-        var port: Int = 5000
-    }
-
-    class HttpConfig {
-        var baseUrl: String = "http://localhost:5001"
+    class OcrServerConfig {
+        var name: String = ""
+        var mode: String = "http"  // http | tcp
+        var enabled: Boolean = true
+        var baseUrl: String = ""   // http 模式：例如 http://127.0.0.1:5001
+        var host: String = "127.0.0.1"  // tcp 模式
+        var port: Int = 5000       // tcp 模式
     }
 }
 

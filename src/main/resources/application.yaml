@@ -31,13 +31,26 @@ encryption:
     key: "shmtu-aes-secret-key-change-in-production"
 
 ocr:
-  mode: http
-  tcp:
-    host: localhost
-    port: 5000
-  http:
-    base-url: http://localhost:5001
-  retry-times: 3
+  # 多 OCR 服务器：调度器按平均耗时升序动态排序；调用时按序尝试，单台失败立即换下一台，最多试 max-try 台。
+  # 默认端口：TCP = 21601, RESTful API = 21600
+  servers:
+    - name: local-http
+      mode: http
+      enabled: true
+      base-url: http://localhost:21600
+    - name: local-tcp
+      mode: tcp
+      enabled: true
+      host: 127.0.0.1
+      port: 21601
+    - name: gpu-server
+      mode: http
+      enabled: false
+      base-url: http://gpu-host:21600
+  max-try: 3
+  per-server-timeout-ms: 3000
+  window-size: 20
+  initial-weight: 1000
 
 scheduler:
   bill-sync:

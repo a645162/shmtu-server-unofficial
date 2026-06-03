@@ -37,7 +37,8 @@ data class UserNotificationSettingsRequest(
     val dingtalkWebhookSecret: String? = null,
     val notificationEmail: String? = null,
     val customWebhookUrl: String? = null,
-    val customWebhookHeaders: String? = null
+    val customWebhookHeaders: String? = null,
+    val messageTemplateOverride: String? = null
 )
 
 data class ChannelInfo(
@@ -46,4 +47,26 @@ data class ChannelInfo(
     val available: Boolean,
     val enabled: Boolean,
     val configuredForUser: Boolean
+)
+
+/** Web 端编辑器：拉取 type 对应的系统默认模板源码 */
+data class TemplateDefaultResponse(
+    val type: String,
+    val source: String,
+    val placeholders: Map<String, String>
+)
+
+/** Web 端编辑器：请求后端校验一段 Handlebars 源码 */
+data class TemplateValidateRequest(
+    val source: String,
+    val type: String = "DEFAULT",
+    val sampleTitle: String = "Sample Title",
+    val sampleContent: String = "Sample content body"
+)
+
+/** Web 端编辑器：返回校验结果 + 渲染后样本 */
+data class TemplateValidateResponse(
+    val valid: Boolean,
+    val rendered: String? = null,
+    val error: String? = null
 )

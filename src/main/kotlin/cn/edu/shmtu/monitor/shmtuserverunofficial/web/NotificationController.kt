@@ -42,4 +42,31 @@ class NotificationController(
         notificationService.updateUserNotificationSettings(userId, request)
         return ApiResponse.ok(message = "Notification settings updated")
     }
+
+    // ============= 模板编辑器接口 =============
+
+    @GetMapping("/notifications/templates/default")
+    fun getDefaultTemplate(
+        @RequestParam("type", defaultValue = "DEFAULT") type: String,
+        authentication: Authentication
+    ): ApiResponse<TemplateDefaultResponse> {
+        authentication.name.toLong()  // ensure authenticated
+        return ApiResponse.ok(notificationService.getDefaultTemplate(type))
+    }
+
+    @PostMapping("/notifications/templates/validate")
+    fun validateTemplate(
+        @RequestBody request: TemplateValidateRequest,
+        authentication: Authentication
+    ): ApiResponse<TemplateValidateResponse> {
+        val userId = authentication.name.toLong()
+        return ApiResponse.ok(notificationService.validateTemplate(userId, request))
+    }
+
+    @DeleteMapping("/notifications/templates/override")
+    fun clearOverride(authentication: Authentication): ApiResponse<Nothing> {
+        val userId = authentication.name.toLong()
+        notificationService.clearUserTemplateOverride(userId)
+        return ApiResponse.ok(message = "Custom message template cleared, system default will be used")
+    }
 }
