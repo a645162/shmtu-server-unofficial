@@ -32,7 +32,7 @@ class SecurityConfig(
                 auth
                     .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                     .requestMatchers("/version", "/health").permitAll()
-                    .requestMatchers("/api/ocr/recognize", "/api/ocr/status").permitAll()
+                    .requestMatchers("/api/ocr/recognize", "/api/ocr/status", "/api/ocr/servers").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
                     .requestMatchers("/api/system/health").permitAll()
                     .requestMatchers("/api/config/**").hasRole("ADMIN")

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   makeStyles,
   tokens,
@@ -10,22 +10,15 @@ import {
   MessageBar,
   MessageBarBody,
   Button,
+  ProgressBar,
 } from '@fluentui/react-components';
 import {
   ArrowSync24Regular,
   CheckmarkCircle24Regular,
   ErrorCircle24Regular,
-  Cloud24Regular,
   Server24Regular,
-  ArrowRight24Regular,
 } from '@fluentui/react-icons';
-import { getDashboard } from '../../api/monitorClient';
-import type {
-  DashboardSummary,
-  ServiceStatusKind,
-  ServerDashboardEntry,
-  InstanceDashboardEntry,
-} from '../../types/monitor';
+import { getOcrServers, type OcrServerInfo } from '../../api/monitorClient';
 
 const useStyles = makeStyles({
   header: {
@@ -47,39 +40,53 @@ const useStyles = makeStyles({
     color: tokens.colorBrandForeground1,
   },
   statLabel: { color: tokens.colorNeutralForeground3, marginTop: '4px' },
-  serverCard: { padding: '20px', marginBottom: '16px' },
-  serverHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: '12px',
-  },
-  instanceGrid: {
+  listCard: { padding: '0' },
+  row: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+    gridTemplateColumns: '2fr 1fr 1.4fr 1.4fr 1.2fr',
     gap: '12px',
+    alignItems: 'center',
+    padding: '14px 20px',
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
   },
-  instanceCard: {
-    padding: '16px',
-    cursor: 'pointer',
-    ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover },
+  headerCols: {
+    color: tokens.colorNeutralForeground3,
+    fontSize: '12px',
   },
-  instanceTitle: { display: 'flex', alignItems: 'center', gap: '8px' },
-  row: { display: 'flex', justifyContent: 'space-between', fontSize: '12px' },
-  empty: { padding: '24px', textAlign: 'center', color: tokens.colorNeutralForeground3 },
   center: { padding: '60px', textAlign: 'center' },
 });
 
-const statusBadge = (s: ServiceStatusKind | undefined) => {
-  if (s === 'healthy') return { color: 'success' as const, label: 'healthy' };
-  if (s === 'busy') return { color: 'warning' as const, label: 'busy' };
-  return { color: 'danger' as const, label: 'unavailable' };
+/**
+ * 单台 OCR 服务器的状态分类（基于 OcrServerInfo 的统计指标推导）：
+ *   - 无样本 → "无样本"
+ *   - 成功率 < 80% → "异常"（danger）
+ *   - 80% ≤ 成功率 < 95% → "降级"（warning）
+ *   - 成功率 ≥ 95% → "健康"（success）
+ *   - enabled=false → "已禁用"（subtle）
+ */
+type Health = 'healthy' | 'degraded' | 'unhealthy' | 'no-samples' | 'disabled';
+
+const classify = (s: OcrServerInfo): Health => {
+  if (!s.enabled) return 'disabled';
+  if (s.sampleCount === 0) return 'no-samples';
+  if (s.successRate < 0.8) return 'unhealthy';
+  if (s.successRate < 0.95) return 'degraded';
+  return 'healthy';
+};
+
+const healthBadge = (h: Health) => {
+  switch (h) {
+    case 'healthy': return { intent: 'success' as const, label: '健康' };
+    case 'degraded': return { intent: 'warning' as const, label: '降级' };
+    case 'unhealthy': return { intent: 'danger' as const, label: '异常' };
+    case 'no-samples': return { intent: 'warning' as const, label: '无样本' };
+    case 'disabled': return { intent: 'subtle' as const, label: '已禁用' };
+  }
 };
 
 const DashboardPage: React.FC = () => {
   const styles = useStyles();
-  const navigate = useNavigate();
-  const [data, setData] = useState<DashboardSummary | null>(null);
+  const [servers, setServers] = useState<OcrServerInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,8 +94,8 @@ const DashboardPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await getDashboard();
-      setData(res);
+      const res = await getOcrServers();
+      setServers(res);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -96,140 +103,144 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+    // 每 10s 自动刷新，与 OcrServerMonitor 探活周期同步
+    const t = window.setInterval(fetchData, 10000);
+    return () => window.clearInterval(t);
+  }, []);
 
-  if (loading) {
+  // 顶部统计
+  const enabledServers = servers.filter((s) => s.enabled);
+  const healthyCount = enabledServers.filter((s) => classify(s) === 'healthy').length;
+  const unhealthyCount = enabledServers.filter((s) => classify(s) === 'unhealthy').length;
+  const totalSamples = servers.reduce((sum, s) => sum + s.sampleCount, 0);
+
+  if (loading && servers.length === 0) {
     return <div className={styles.center}><Spinner size="medium" /></div>;
   }
-  if (error) {
-    return <MessageBar intent="error"><MessageBarBody>{error}</MessageBarBody></MessageBar>;
-  }
-  if (!data) return null;
 
   return (
     <div>
       <div className={styles.header}>
-        <Text size={600} weight="semibold">SHMTU Service Monitor</Text>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Server24Regular style={{ color: tokens.colorBrandForeground1 }} />
+          <Text size={600} weight="semibold">OCR 服务监控</Text>
+          <Badge appearance="filled" color="brand">
+            {servers.length === 0 ? '无配置' : `${healthyCount}/${enabledServers.length} 健康`}
+          </Badge>
+        </div>
         <Button appearance="subtle" icon={<ArrowSync24Regular />} onClick={fetchData}>
-          Refresh
+          刷新
         </Button>
       </div>
 
+      {error && (
+        <MessageBar intent="error" style={{ marginBottom: '12px' }}>
+          <MessageBarBody>{error}</MessageBarBody>
+        </MessageBar>
+      )}
+
       <div className={styles.statGrid}>
         <Card className={styles.statCard}>
-          <div className={styles.statValue}>{data.total_servers}</div>
+          <div className={styles.statValue}>{servers.length}</div>
           <div className={styles.statLabel}>
-            <Cloud24Regular /> Server Groups
-          </div>
-        </Card>
-        <Card className={styles.statCard}>
-          <div className={styles.statValue}>{data.total_instances}</div>
-          <div className={styles.statLabel}>
-            <Server24Regular /> Instances
+            <Server24Regular /> OCR 服务器总数
           </div>
         </Card>
         <Card className={styles.statCard}>
           <div className={styles.statValue} style={{ color: tokens.colorPaletteGreenForeground1 }}>
-            {data.healthy_instances}
+            {healthyCount}
           </div>
           <div className={styles.statLabel}>
-            <CheckmarkCircle24Regular style={{ color: tokens.colorPaletteGreenForeground1 }} /> Healthy
+            <CheckmarkCircle24Regular style={{ color: tokens.colorPaletteGreenForeground1 }} /> 健康
           </div>
         </Card>
         <Card className={styles.statCard}>
           <div className={styles.statValue} style={{ color: tokens.colorPaletteRedForeground1 }}>
-            {data.unavailable_instances}
+            {unhealthyCount}
           </div>
           <div className={styles.statLabel}>
-            <ErrorCircle24Regular style={{ color: tokens.colorPaletteRedForeground1 }} /> Unavailable
+            <ErrorCircle24Regular style={{ color: tokens.colorPaletteRedForeground1 }} /> 异常
           </div>
+        </Card>
+        <Card className={styles.statCard}>
+          <div className={styles.statValue}>{totalSamples}</div>
+          <div className={styles.statLabel}>累计探活样本</div>
         </Card>
       </div>
 
-      <div style={{ marginBottom: '16px' }}>
-        <Button appearance="subtle" onClick={() => navigate('/monitor/servers')}>
-          <Server24Regular /> Manage Servers →
-        </Button>
-      </div>
-
-      {data.servers.map((serverEntry: ServerDashboardEntry) => {
-        const healthy = serverEntry.instances.filter(
-          (e) => e.latest_status?.status === 'healthy'
-        ).length;
-        const total = serverEntry.instances.length;
-        const allHealthy = healthy === total && total > 0;
-        const someHealthy = healthy > 0;
-
-        return (
-          <Card key={serverEntry.server.id} className={styles.serverCard}>
-            <div className={styles.serverHeader}>
-              <div>
-                <Text size={500} weight="semibold">{serverEntry.server.name}</Text>
-                <Text size={200} style={{ marginLeft: '8px', color: tokens.colorNeutralForeground3 }}>
-                  {healthy}/{total} healthy
-                </Text>
+      {servers.length === 0 ? (
+        <MessageBar intent="info">
+          <MessageBarBody>
+            暂无 OCR 服务器，请先在 <Link to="/about">关于</Link> 页面查看配置说明，并在 application.yaml 的 <code>ocr.servers</code> 中添加。
+          </MessageBarBody>
+        </MessageBar>
+      ) : (
+        <Card className={styles.listCard}>
+          <div className={styles.row}>
+            <Text size={200} className={styles.headerCols}>名称 / 地址</Text>
+            <Text size={200} className={styles.headerCols}>模式</Text>
+            <Text size={200} className={styles.headerCols}>平均延迟</Text>
+            <Text size={200} className={styles.headerCols}>成功率</Text>
+            <Text size={200} className={styles.headerCols}>状态</Text>
+          </div>
+          {servers.map((s) => {
+            const h = classify(s);
+            const meta = healthBadge(h);
+            const percent = s.sampleCount > 0 ? Math.round(s.successRate * 100) : 0;
+            return (
+              <div key={s.name} className={styles.row}>
+                <div>
+                  <Text weight="semibold">{s.name}</Text>
+                  <br />
+                  <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+                    {s.address}
+                  </Text>
+                </div>
+                <Badge appearance="ghost" size="small">
+                  {s.mode.toUpperCase()}
+                </Badge>
+                <div>
+                  {s.sampleCount > 0 ? (
+                    <Text>{s.avgLatencyMs.toFixed(1)} ms</Text>
+                  ) : (
+                    <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>—</Text>
+                  )}
+                  <br />
+                  <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+                    {s.sampleCount} 样本
+                  </Text>
+                </div>
+                <div>
+                  {s.sampleCount > 0 ? (
+                    <>
+                      <ProgressBar
+                        value={percent}
+                        color={
+                          h === 'healthy' ? 'success' :
+                          h === 'degraded' ? 'warning' :
+                          h === 'unhealthy' ? 'error' : 'neutral'
+                        }
+                      />
+                      <Text size={200}>{percent.toFixed(1)}%</Text>
+                    </>
+                  ) : (
+                    <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>—</Text>
+                  )}
+                </div>
+                <Badge appearance="filled" color={
+                  meta.intent === 'success' ? 'success' :
+                  meta.intent === 'warning' ? 'warning' :
+                  meta.intent === 'danger' ? 'danger' : 'subtle'
+                }>
+                  {meta.label}
+                </Badge>
               </div>
-              <Button
-                appearance="subtle"
-                size="small"
-                onClick={() => navigate(`/monitor/servers/${serverEntry.server.id}`)}
-                icon={<ArrowRight24Regular />}
-                iconPosition="after"
-              >
-                Details
-              </Button>
-            </div>
-
-            {serverEntry.server.description && (
-              <Text size={200} style={{ color: tokens.colorNeutralForeground2, marginBottom: '12px', display: 'block' }}>
-                {serverEntry.server.description}
-              </Text>
-            )}
-
-            <Badge
-              appearance="filled"
-              color={allHealthy ? 'success' : someHealthy ? 'warning' : 'danger'}
-              style={{ marginBottom: '12px' }}
-            >
-              {allHealthy ? 'all healthy' : someHealthy ? 'partial' : 'unavailable'}
-            </Badge>
-
-            <div className={styles.instanceGrid}>
-              {serverEntry.instances.map((entry: InstanceDashboardEntry) => {
-                const inst = entry.instance;
-                const st = entry.latest_status;
-                const cfg = statusBadge(st?.status);
-                return (
-                  <Card
-                    key={inst.id}
-                    className={styles.instanceCard}
-                    onClick={() => navigate(`/monitor/instances/${inst.id}`)}
-                  >
-                    <div className={styles.instanceTitle}>
-                      <Badge appearance="filled" color={cfg.color}>{st?.status ?? 'unknown'}</Badge>
-                      <Text weight="semibold">{inst.name}</Text>
-                    </div>
-                    <div style={{ marginTop: '4px' }}>
-                      <Badge appearance="ghost" size="small">{inst.service_type}</Badge>
-                    </div>
-                    {st ? (
-                      <div style={{ marginTop: '8px' }}>
-                        <div className={styles.row}><Text size={200}>Models</Text><Text size={200}>{st.models_loaded ? 'Loaded' : 'Not Loaded'}</Text></div>
-                        <div className={styles.row}><Text size={200}>Queue</Text><Text size={200}>{st.pending_requests}/{st.queue_capacity}</Text></div>
-                        <div className={styles.row}><Text size={200}>Response</Text><Text size={200}>{st.response_time_ms.toFixed(1)}ms</Text></div>
-                      </div>
-                    ) : (
-                      <Text size={200} style={{ color: tokens.colorNeutralForeground3, marginTop: '8px', display: 'block' }}>
-                        No status data
-                      </Text>
-                    )}
-                  </Card>
-                );
-              })}
-            </div>
-          </Card>
-        );
-      })}
+            );
+          })}
+        </Card>
+      )}
     </div>
   );
 };

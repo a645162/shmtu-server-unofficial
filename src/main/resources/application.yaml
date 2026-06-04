@@ -51,6 +51,11 @@ ocr:
   per-server-timeout-ms: 3000
   window-size: 20
   initial-weight: 1000
+  # Monitor 模块：每 N 毫秒主动探活每台 enabled OCR 服务器，把结果灌入 OcrServerRegistry。
+  # 替代旧 shmtu-service-monitor (Rust axum) 的 poller；前端 monitor 页面通过 /api/ocr/servers 读取。
+  monitor:
+    initial-delay-ms: 5000
+    interval-ms: 10000
 
 scheduler:
   bill-sync:

@@ -4,9 +4,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import AboutPage from './pages/AboutPage';
 import MonitorDashboardPage from './pages/monitor/DashboardPage';
-import MonitorServerListPage from './pages/monitor/ServerListPage';
-import MonitorServerDetailPage from './pages/monitor/ServerDetailPage';
-import MonitorInstanceDetailPage from './pages/monitor/InstanceDetailPage';
 
 // Admin (/admin/*)
 import AdminLoginPage from './pages/admin/LoginPage';
@@ -32,9 +29,6 @@ const App: React.FC = () => {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/monitor" element={<Navigate to="/monitor/dashboard" replace />} />
         <Route path="/monitor/dashboard" element={<MonitorDashboardPage />} />
-        <Route path="/monitor/servers" element={<MonitorServerListPage />} />
-        <Route path="/monitor/servers/:id" element={<MonitorServerDetailPage />} />
-        <Route path="/monitor/instances/:id" element={<MonitorInstanceDetailPage />} />
 
         {/* Admin (/admin/*) */}
         <Route path="/admin/login" element={<AdminLoginPage />} />

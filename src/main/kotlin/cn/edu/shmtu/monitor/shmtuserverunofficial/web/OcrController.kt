@@ -28,9 +28,12 @@ class OcrController(
         return ApiResponse.ok(ocrService.getStatus())
     }
 
-    /** 列出所有已配置 OCR 服务器的实时状态（按平均耗时升序）。管理员可见。 */
+    /**
+     * 列出所有已配置 OCR 服务器的实时状态（按平均耗时升序）。
+     * Monitor 端点：原 service-monitor 的 /api/dashboard 等接口合并到这里。
+     * 前端 monitor 页面（/monitor/...）公开访问。
+     */
     @GetMapping("/servers")
-    @PreAuthorize("hasRole('ADMIN')")
     fun listServers(): ApiResponse<List<OcrServerStatus>> {
         return ApiResponse.ok(ocrServerRegistry.toStatusDtos())
     }
